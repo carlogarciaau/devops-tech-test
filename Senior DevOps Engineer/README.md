@@ -1,26 +1,34 @@
-# Senior DevOps Engineer - technical interview
 
-## Testing goals
-- With this test, we want to see your ability to create an entire infrastructure from scratch as well as your skills in cloud engineering, automation and as a system administrator.
+# Deploying a Containerised Flask Application in GCP
 
-## The task
-- We want to containerise and deploy `hello.py` to your choice of cloud provider listed below with one of their managed container solutions (eg: EKS or ECS), we want a secure isolated environment, and we want to run multiple containers on an instance.
+This project demonstrates how to deploy a containerised flask application to GCP. 
 
-## The solution
-- In your solution, please emphasise on readability, maintainability and DevOps methodologies. We expect a clear way to recreate your setup.
-- A Docker container running our Flask application.
-- The infrastructure provider should be AWS, GCP or Azure.
-- Use an infrastructure as code tool of choice (Terraform, Ansible, Cloudformation etc) as the configuration management tool including any Dockerfiles and scripts.
-- Make sure to include a README.md with clear instructions, so we can run your code.
-- A CI/CD spec file using your choice of CI tool (Jenkins, GitLab or Bamboo).
-- A clean bare minimum working infrastructure is preferred than a full-blown solution pieced together with scissors, rope and duct tape. Do not skip security considerations.
+The solution involves the following:
+1. Infrastructure-as-Code (Terraform) to provision the GCP infrastructure.
+2. Cloud Build pipeline to build a Docker image, push it to the GCP registry and deploy to Cloud Run. 
 
-## When you are finished
-- Submit your solution to a GitHub repository and send us a link.
-- Make sure your README tells us how to run it.
-- Please fork this repo so that you are tested against the test that you started with, as this test may change.
+The cloud run service will be exposed via an External HTTPS Load Balancer to enable us to route traffic via the VPC network and utilise additional GCP services like Cloud CDN and Cloud Armor.
 
-## Bonus points
-- If you can setup a Git branching strategy.
-- If you can document all aspects of your code, in the README and within the code itself.
-- If you can provide a PNG diagram of your infrastructure.
+## Pre-requisites
+1. A GCP project with billing enabled
+2. Terraform CLI (https://developer.hashicorp.com/terraform/downloads)
+3. gcloud CLI (https://cloud.google.com/sdk/docs/install). Configure with `gcloud init` and `gcloud auth application-default login`
+4. A registered domain for provisioning SSL certificates
+5. Update the `terraform.tfvars` file with your own configuration
+
+## How to provision the infrastructure
+1. Go to the terraform directory
+2. Run `terraform init` to initialise the working directory
+3. Provision the GCP resources using `terraform fmt/validate/plan/apply`
+4. Once terraform completes, it will output the public IP address of the load balancer. Setup an `A record` on your DNS service for the domain in the tfvars file and this IP address. In a production environment this should be handled by Terraform on Cloud DNS or similar. 
+5. Certificate provisioning may take up to an hour to complete. Monitor this in [Certificate Manager](https://cloud.google.com/certificate-manager/docs/overview)
+
+## How to build and deploy the Flask application
+1. Go to the app directory 
+2. Go to IAM and grant the Cloud Build Service Account `Cloud Run Admin` and `Service Account User` roles.
+3. Run the following: 
+`gcloud builds submit --config cloudbuild.yaml --substitutions=REPO_NAME="flask-app-test",_REGION="australia-southeast1"`. This triggers the pipeline as defined in `cloudbuild.yaml`.
+
+## Shutting down the infrastructure
+1. Go to the sample-static-website-gcp/terraform directory
+2. Run `terraform destroy` and review the resources before proceeding.
