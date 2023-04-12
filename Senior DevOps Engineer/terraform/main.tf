@@ -16,70 +16,106 @@ resource "google_project_service" "cloudbuild" {
   disable_on_destroy = false
 }
 
+# Enable VPC Access API
+resource "google_project_service" "vpcaccess" {
+  service            = "vpcaccess.googleapis.com"
+  disable_on_destroy = false
+}
+
+# Create a VPC
+resource "google_compute_network" "vpc" {
+  name = "my-vpc"
+}
+
+# Create a subnet in the VPC
+resource "google_compute_subnetwork" "subnet" {
+  name          = "my-subnet"
+  network       = google_compute_network.vpc.self_link
+  ip_cidr_range = "10.0.0.0/24"
+  region        = "australia-southeast1"
+}
+
+# Create a VPC connector for Cloud Run
+resource "google_vpc_access_connector" "connector" {
+  name          = "my-vpc-connector"
+  region        = "australia-southeast1"
+  network       = google_compute_network.vpc.name
+  ip_cidr_range = "10.8.0.0/28"
+}
+
+
+# Create a Cloud Run service
+resource "google_cloud_run_service" "backend" {
+  name     = "flask-hello-world"
+  location = "australia-southeast1"
+
+  template {
+    spec {
+      containers {
+        image = "${var.region}-docker.pkg.dev/flask-deployment-test-383404/docker-repo-test/flask-hello:TEST"
+      }
+    }
+  }
+}
+
+# Create a network endpoint group out of the serverless service
+resource "google_compute_region_network_endpoint_group" "cloudrun_neg" {
+  name                  = "serverless-neg"
+  network_endpoint_type = "SERVERLESS"
+  region                = var.region
+  cloud_run {
+    service = google_cloud_run_service.backend.name
+  }
+}
+
+# Create an ingress firewall rule to allow traffic from the VPC
+resource "google_compute_firewall" "allow_vpc_traffic" {
+  name    = "allow-vpc-traffic"
+  network = google_compute_network.vpc.self_link
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80", "443"]
+  }
+
+  source_ranges = [google_compute_subnetwork.subnet.ip_cidr_range]
+}
 
 ### Create an HTTPS Load Balancer ###
 
 # Create a global IP address for the load balancer
 resource "google_compute_global_address" "frontend_ip" {
-  name = "frontend"
+  name    = "frontend"
   purpose = "GLOBAL"
 }
 
 # Create a backend service
 resource "google_compute_backend_service" "backend_service" {
-  name = "my-backend-service"
-
-  backend {
-    group = google_cloud_run_service.backend.status.0.url
+  name            = "serverless-backend-service"
+  enable_cdn      = true
+  security_policy = google_compute_security_policy.policy.self_link
+  cdn_policy {
+    signed_url_cache_max_age_sec = 7200
   }
 
-  health_checks = [
-    google_compute_health_check.backend_health_check.self_link
-  ]
+  backend {
+    group = google_compute_region_network_endpoint_group.cloudrun_neg.id
+  }
 
-  port_name        = "http"
-  protocol         = "HTTP"
-  timeout_sec      = 10
-  connection_draining_timeout_sec = 10
 }
 
 # Create a URL map
 resource "google_compute_url_map" "url_map" {
   name            = "url-map"
-  default_service = google_compute_backend_service.backend_service.self_link
+  default_service = google_compute_backend_service.backend_service.id
 }
 
-# Create a health check for the backend
-resource "google_compute_health_check" "backend_health_check" {
-  name = "backend-health-check"
 
-  http_health_check {
-    port = 443
-  }
-}
-
-# Create a target HTTP proxy
-resource "google_compute_target_http_proxy" "http_proxy" {
-  name   = "my-http-proxy"
-  url_map = google_compute_url_map.url_map.self_link
-}
-
-# Create a backend service
-resource "google_compute_backend_service" "backend_service" {
-  name = "my-backend-service"
-
-  backend {
-    group = google_cloud_run_service.backend.status.0.url
-  }
-
-  health_checks = [
-    google_compute_health_check.backend_health_check.self_link
-  ]
-
-  port_name        = "http"
-  protocol         = "HTTP"
-  timeout_sec      = 10
-  connection_draining_timeout_sec = 10
+# Create a target HTTPS proxy
+resource "google_compute_target_https_proxy" "https_proxy" {
+  name             = "https-proxy"
+  url_map          = google_compute_url_map.url_map.self_link
+  ssl_certificates = [google_compute_managed_ssl_certificate.managed_ssl_cert.id]
 }
 
 # Create a global forwarding rule
@@ -95,7 +131,24 @@ resource "google_compute_global_forwarding_rule" "https_forwarding_rule" {
 resource "google_compute_managed_ssl_certificate" "managed_ssl_cert" {
   name = "managed-ssl-certificate"
   managed {
-    domains = var.my_domains
+    domains = var.domains
+  }
+}
+
+# Create Security Policy
+resource "google_compute_security_policy" "policy" {
+  name = "security-policy"
+
+  rule {
+    action   = "allow"
+    priority = "2147483647"
+    match {
+      versioned_expr = "SRC_IPS_V1"
+      config {
+        src_ip_ranges = ["*"]
+      }
+    }
+    description = "default rule"
   }
 }
 

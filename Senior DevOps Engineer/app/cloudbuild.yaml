@@ -7,18 +7,18 @@ steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', '$_REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/flask-hello:TEST']
 
-# Deploy the container image to Cloud Run
-- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  entrypoint: gcloud
-  args:
-  - 'run'
-  - 'deploy'
-  - 'flask-hello'
-  - '--image'
-  - '$_REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/flask-hello:TEST'
-  - '--region'
-  - '$_REGION'
-  - '--allow-unauthenticated'
+# # Deploy the container image to Cloud Run
+# - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+#   entrypoint: gcloud
+#   args:
+#   - 'run'
+#   - 'deploy'
+#   - 'flask-hello'
+#   - '--image'
+#   - '$_REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/flask-hello:TEST'
+#   - '--region'
+#   - '$_REGION'
+#   - '--allow-unauthenticated'
 
 images:
 - '$_REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/flask-hello:TEST'

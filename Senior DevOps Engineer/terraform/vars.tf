@@ -8,10 +8,6 @@ variable "region" {
   type        = string
 }
 
-variable "bucket_name" {
-  description = "Bucket to host static files"
-}
-
-variable "my_domains" {
-  description = "List of domain names for which the Google managed SSL certificate will be valid. This needs to be configured at your DNS service provider."
+variable "domains" {
+  description = "Domain name for which the Google managed SSL certificate will be valid. This needs to be configured at your DNS service provider."
 }
