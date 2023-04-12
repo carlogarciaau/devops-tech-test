@@ -28,7 +28,7 @@ Furthermore, the Continuous Delivery (CD) part of this architecture will be mana
 1. Go to the app directory 
 2. Go to IAM and grant the Cloud Build Service Account `Cloud Run Admin` and `Service Account User` roles.
 3. Run the following: 
-`gcloud builds submit --config cloudbuild.yaml --substitutions=REPO_NAME="flask-app-test",_REGION="australia-southeast1"`. This triggers the pipeline as defined in `cloudbuild.yaml`.
+`gcloud builds submit --config cloudbuild.yaml --substitutions=REPO_NAME="docker-repo-test",_REGION="australia-southeast1"`. This triggers the pipeline as defined in `cloudbuild.yaml`.
 
 ## Architecture - Infrastructure
 ![infrastructure](./img/infrastructure.png)
