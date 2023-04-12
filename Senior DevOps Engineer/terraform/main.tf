@@ -32,13 +32,13 @@ resource "google_compute_subnetwork" "subnet" {
   name          = "my-subnet"
   network       = google_compute_network.vpc.self_link
   ip_cidr_range = "10.0.0.0/24"
-  region        = "australia-southeast1"
+  region        = var.region
 }
 
 # Create a VPC connector for Cloud Run
 resource "google_vpc_access_connector" "connector" {
   name          = "my-vpc-connector"
-  region        = "australia-southeast1"
+  region        = var.region
   network       = google_compute_network.vpc.name
   ip_cidr_range = "10.8.0.0/28"
 }
@@ -47,12 +47,23 @@ resource "google_vpc_access_connector" "connector" {
 # Create a Cloud Run service
 resource "google_cloud_run_service" "backend" {
   name     = "flask-hello-world"
-  location = "australia-southeast1"
+  location = var.region
 
   template {
     spec {
       containers {
         image = "${var.region}-docker.pkg.dev/flask-deployment-test-383404/docker-repo-test/flask-hello:TEST"
+      }
+    }
+
+    metadata {
+      annotations = {
+        # Limit scale up to prevent any cost blow outs!
+        "autoscaling.knative.dev/maxScale" = "5"
+        # Use the VPC Connector
+        "run.googleapis.com/vpc-access-connector" = google_vpc_access_connector.connector.name
+        # all egress from the service should go through the VPC Connector
+        "run.googleapis.com/vpc-access-egress" = "all-traffic"
       }
     }
   }
