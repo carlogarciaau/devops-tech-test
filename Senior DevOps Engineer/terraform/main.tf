@@ -69,8 +69,19 @@ resource "google_cloud_run_service" "backend" {
   }
 }
 
+# Allow public access to the cloud run service
+resource "google_cloud_run_service_iam_binding" "backend" {
+  location = google_cloud_run_service.backend.location
+  service  = google_cloud_run_service.backend.name
+  role     = "roles/run.invoker"
+  members = [
+    "allUsers"
+  ]
+}
+
 # Create a network endpoint group out of the serverless service
 resource "google_compute_region_network_endpoint_group" "cloudrun_neg" {
+  provider              = google-beta
   name                  = "serverless-neg"
   network_endpoint_type = "SERVERLESS"
   region                = var.region
@@ -108,6 +119,8 @@ resource "google_compute_backend_service" "backend_service" {
   cdn_policy {
     signed_url_cache_max_age_sec = 7200
   }
+
+  protocol = "HTTPS"
 
   backend {
     group = google_compute_region_network_endpoint_group.cloudrun_neg.id
